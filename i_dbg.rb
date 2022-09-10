@@ -94,27 +94,15 @@ class IDbg
     end
 
     def backtrace(level = IDBG_BACKTRACE_DEFAULT_LEVEL, line_limit: 1000)
-      backtrace = backtrace_list
-
-      if level > 0
-        backtrace.select! { |loc| Regexp.new(IDBG_BACKTRACE_LEVEL_FILTERS[level - 1]) =~ loc.to_s }
-      end
-
     	with_logfile do |f|
     		f << "#{signature} -- BACKTRACE\n\n"
-    		backtrace.take(line_limit).each { |loc| f << "\t\e[36m#{prettify_backtrace_location(loc)}\e[0m\n" }
+        generate_backtrace(level, line_limit: line_limit) { |line| f << "\t" + line + "\n" }
 	    	f << "\n"
     	end
     end
 
     def dump_backtrace(level = IDBG_BACKTRACE_DEFAULT_LEVEL, line_limit: 1000)
-      backtrace = backtrace_list
-
-      if level > 0
-        backtrace.select! { |loc| Regexp.new(IDBG_BACKTRACE_LEVEL_FILTERS[level - 1]) =~ loc.to_s }
-      end
-
-      backtrace.take(line_limit).map { |loc| puts "\e[36m#{prettify_backtrace_location(loc)}\e[0m" }
+      generate_backtrace(level, line_limit: line_limit) { |line| puts line }
 
       nil
     end
@@ -154,6 +142,18 @@ class IDbg
     end
 
     private
+
+    def generate_backtrace(level = IDBG_BACKTRACE_DEFAULT_LEVEL, line_limit: 1000)
+      backtrace = backtrace_list
+
+      if level > 0
+        backtrace.select! { |loc| Regexp.new(IDBG_BACKTRACE_LEVEL_FILTERS[level - 1]) =~ loc.to_s }
+      end
+
+      backtrace.take(line_limit).map { |loc| yield "\e[36m#{prettify_backtrace_location(loc)}\e[0m" }
+
+      nil
+    end
 
     def signature
     	"[\e[95m#{timestamp}\e[0m \e[2m#{caller}\e[0m]"

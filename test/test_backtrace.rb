@@ -13,6 +13,9 @@ def alpha
 
   IDbg.log('All')
   IDbg.backtrace
+
+  IDbg.log('Source terminal log')
+  IDbg.dump_backtrace
 end
 
 def beta
