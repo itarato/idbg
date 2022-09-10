@@ -20,15 +20,32 @@ IDBG_SEMAPHORE_FILE = IDBG_SCRIPTS_FOLDER + "/once.txt"
 ###############################################################################
 
 class IDbg
+  # TODO: filter and exclusion patterns
+  # TODO: inspector / breakpoint (~: yield if block evals to true)
   module AllMethodLogger
+    @@with_args = false
+
+    def self.with_args
+      @@with_args = true
+      self
+    end
+
     def self.included(target)
+      with_args = @@with_args
+      @@with_args = false
+
       methods = target.instance_methods - target.class.superclass.instance_methods
 
       methods.each do |method|
         target.send(:alias_method, "__old_#{method}", method)
 
         target.define_method("__new_#{method}") do |*args|
-          IDbg.log("Called: #{target}.#{method}")
+          if with_args
+            IDbg.log("Called: #{target}\##{method}", "Args", args)
+          else
+            IDbg.log("Called: #{target}\##{method}")
+          end
+
           send("__old_#{method}", *args)
         end
 
@@ -38,7 +55,7 @@ class IDbg
   end
 
   class << self
-    def log_all
+    def function_logger
       AllMethodLogger
     end
 
