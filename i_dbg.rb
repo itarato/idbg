@@ -124,7 +124,7 @@ class IDbg
       Rails.application.routes.recognize_path(path, method: method)
     end
 
-    def once(tag)
+    def once(tag, *args)
       open(IDBG_SEMAPHORE_FILE, 'a+') {}
 
       f = File.open(IDBG_SEMAPHORE_FILE)
@@ -132,13 +132,25 @@ class IDbg
       f.close
 
       if flags.include?(tag)
-        log("Tag #{tag} has already run")
+        log("Tag #{tag} has already run", *args)
+        return
       end
 
-      open(IDBG_SEMAPHORE_FILE, 'w+') { |f| f << "#{tag}\n" }
+      open(IDBG_SEMAPHORE_FILE, 'a+') { |f| f << "#{tag}\n" }
 
-      log("Tag #{tag} is executed once now")
+      log("Tag #{tag} is executed once now", *args)
+      
       yield
+    end
+
+    def reset_once(*tags)
+      f = File.open(IDBG_SEMAPHORE_FILE)
+      flags = f.readlines.map(&:chomp)
+      f.close
+
+      flags -= tags
+
+      open(IDBG_SEMAPHORE_FILE, 'w+') { |f| f << flags.join("\n") }
     end
 
     private
