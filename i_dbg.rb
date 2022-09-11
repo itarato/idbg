@@ -76,16 +76,14 @@
 # with or without arguments:
 #
 # ```ruby
-# class SomeClass
-#   # ... content
-#
+# class SomeClassgenerate_backtrace
 #   # Insert before closing `end`:
 #   include(IDbg.function_logger.with_args)
 # end
 # ```
 #
 # ---
-# Component: external/custom script executors
+# Component: complex debug script reactors
 #
 # Sometimes a debugging is just so convoluted or maybe it's even evolving into
 # its own code that it's better to keep it somewhere else. As well - these
@@ -123,6 +121,14 @@
 # IDbg.break_if(:my_script, "arg1", { arg2: "foo" })
 # ```
 #
+# It's also possible to run whole script files without expected reaction when
+# the logic deserves its own file. These files are expected to exist in
+# `IDBG_SCRIPTS_FOLDER/<NAME>.rb`:
+#
+# ```ruby
+# IDbg.run("user_registration_script")
+# ```
+#
 # ---
 # Component: backtrace
 #
@@ -131,21 +137,78 @@
 #
 # ```ruby
 # # Log a backtrace to the log file.
-# IDbg.backtrace
+# IDbg.backtrace(level: 2)
 # # Dump it right on the current output:
 # IDbg.dump_backtrace
+# # Combine backtrace and logging
+# IDbg.backtrace(@user, @ctx)
+# ```
+#
+# Levels are generally used by gradually filtering out external components,
+# such as: gems > external libs > internal libs > components > ... Level 0
+# is always the full backtrace.
+# For configuration see: `IDBG_BACKTRACE_LEVEL_FILTERS`
+# Example of a level setting where level-1 is filtering to all-except-gems and
+# level-2 is only-rails-app:
+# `export IDBG_BACKTRACE_LEVEL_FILTERS="my_project,my_project/app"`
+#
+# ---
+# Component: counter
+#
+# Counter is counting each call.
+#
+# ```ruby
+# IDbg.count("user-reload")
+# ```
+#
+# ---
+# Component: once-calls
+#
+# Sometimes a debugging or testing code snippet only should be called once
+# only.
+#
+# ```ruby
+# # Hypothetical loop where we only care about the first iteration.
+# IDbg.reset_once(:cache_check)
+# loop do
+#   IDbg.once(:cache_check, @cache)
+# end
 # ```
 
 ###############################################################################
 # CONFIGURATION
 ###############################################################################
 
+#
+# This log file is the main log collector.
+# Recommended watch cmd: `tail -F <LOGFILE>`
+#
 IDBG_LOGFILE = ENV["IDBG_LOGFILE"] || "/tmp/idbg.log"
-IDBG_PROJECT_FOLDER = ENV["IDBG_PROJECT_FOLDER"] || "."
+
+#
+# Scripts folder is where auxiliary files are kept / created.
+# It typically has:
+# - break.rb (containing break script functions)
+# - debug script files
+# - once.txt (used for once-semaphores)
+#
 IDBG_SCRIPTS_FOLDER = ENV["IDBG_SCRIPTS_FOLDER"] || "/tmp"
+
+#
+# Backtrace levels are for narrowing down the scope of listed backtrace lines.
+# For example gems, external libraries and non-app folders are not always
+# useful in an investigation.
+# This value expects a comma separated string list. Each string part is evaluated
+# as a regular expression: when a backtrace is requested with level X, the
+# backtrace only lists sources that matches with the (X - 1)th part.
+#
 IDBG_BACKTRACE_LEVEL_FILTERS = ENV["IDBG_BACKTRACE_LEVEL_FILTERS"]&.split(",") || []
+
+#
+# Default backtrace level. 0 is for a full backtrace list. (Typically the higher
+# the level the less the backtrace is.)
+#
 IDBG_BACKTRACE_DEFAULT_LEVEL = 0
-IDBG_SEMAPHORE_FILE = IDBG_SCRIPTS_FOLDER + "/once.txt"
 
 ###############################################################################
 # CODE
@@ -238,23 +301,19 @@ class IDbg
     end
     alias_method(:<<, :log)
 
-    def log_and_backtrace(*args, level: 2, line_limit: 1000)
-      result = log(*args)
+    def backtrace(*args, level: IDBG_BACKTRACE_DEFAULT_LEVEL, line_limit: 1000)
+      log(*args) if !args.empty?
 
-      backtrace(level, line_limit: line_limit)
-
-      result
-    end
-
-    def backtrace(level = IDBG_BACKTRACE_DEFAULT_LEVEL, line_limit: 1000)
     	with_logfile do |f|
     		f << "#{signature} -- BACKTRACE\n\n"
         generate_backtrace(level, line_limit: line_limit) { |line| f << "\t" + line + "\n" }
 	    	f << "\n"
     	end
+
+      args.first
     end
 
-    def dump_backtrace(level = IDBG_BACKTRACE_DEFAULT_LEVEL, line_limit: 1000)
+    def dump_backtrace(level: IDBG_BACKTRACE_DEFAULT_LEVEL, line_limit: 1000)
       generate_backtrace(level, line_limit: line_limit) { |line| puts line }
 
       nil
@@ -269,8 +328,10 @@ class IDbg
       log("Count [#{key}] = #{@counters[key]}")
     end
 
-    def run(script = 'scratchpad')
-      eval(File.read(IDBG_SCRIPTS_FOLDER + "/#{script}.rb"))
+    def run(script, *args)
+      DataBank.with_data(args) do
+        eval(File.read(IDBG_SCRIPTS_FOLDER + "/#{script}.rb"))
+      end
     end
 
     def path?(path, method = 'GET')
@@ -278,18 +339,18 @@ class IDbg
     end
 
     def once(tag, *args)
-      open(IDBG_SEMAPHORE_FILE, 'a+') {}
+      open(IDBG_SCRIPTS_FOLDER + "/once.txt", 'a+') {}
 
-      f = File.open(IDBG_SEMAPHORE_FILE)
+      f = File.open(IDBG_SCRIPTS_FOLDER + "/once.txt")
       flags = f.readlines.map(&:chomp)
       f.close
 
-      if flags.include?(tag)
+      if flags.include?(tag.to_s)
         log("Tag #{tag} has already run", *args)
         return
       end
 
-      open(IDBG_SEMAPHORE_FILE, 'a+') { |f| f << "#{tag}\n" }
+      open(IDBG_SCRIPTS_FOLDER + "/once.txt", 'a+') { |f| f << "#{tag.to_s}\n" }
 
       log("Tag #{tag} is executed once now", *args)
 
@@ -297,13 +358,13 @@ class IDbg
     end
 
     def reset_once(*tags)
-      f = File.open(IDBG_SEMAPHORE_FILE)
+      f = File.open(IDBG_SCRIPTS_FOLDER + "/once.txt")
       flags = f.readlines.map(&:chomp)
       f.close
 
-      flags -= tags
+      flags -= tags.map(&:to_s)
 
-      open(IDBG_SEMAPHORE_FILE, 'w+') { |f| f << flags.join("\n") }
+      open(IDBG_SCRIPTS_FOLDER + "/once.txt", 'w+') { |f| f << flags.join("\n") }
     end
 
     private

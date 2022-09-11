@@ -6,13 +6,13 @@ require_relative("../i_dbg.rb")
 
 def alpha
   IDbg.log('Without lib or gem wrap')
-  IDbg.backtrace(2)
+  IDbg.backtrace(level: 2)
 
   IDbg.log('Without gem wrap only')
-  IDbg.backtrace(1)
+  IDbg.backtrace(level: 1)
 
   IDbg.log('All')
-  IDbg.backtrace
+  IDbg.backtrace("params", "another")
 
   IDbg.log('Source terminal log')
   IDbg.dump_backtrace
