@@ -1,4 +1,5 @@
 def always_true
+  IDbg.log("True args", DataBank.data)
   true
 end
 

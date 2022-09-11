@@ -64,13 +64,21 @@
 # ---
 # Component: call logger
 #
-# Say you're interested in knowing the order of execution and what functions 
+# Say you're interested in knowing the order of execution and what functions
 # were executed in a class during a flow. IDbg allows logging all calls and
 # with or without arguments:
 #
 # ```ruby
-# 
+# class SomeClass
+#   # ... content
+#
+#   # Insert before closing `end`:
+#   include(IDbg.function_logger.with_args)
+# end
 # ```
+#
+# ---
+# Component:
 #
 
 ###############################################################################
@@ -123,23 +131,43 @@ class IDbg
     end
   end
 
+  class DataBank
+    @@data = nil
+
+    def self.with_data(*args)
+      @@data = args
+      result = yield
+      @@data = nil
+
+      result
+    end
+
+    def self.data = @@data
+  end
+
   class << self
     def function_logger
       AllMethodLogger
     end
 
-    def real_time_if(tag = :default)
+    def real_time_if(tag = :default, *args)
       source = File.read(IDBG_SCRIPTS_FOLDER + "/break.rb")
       source += "\n#{tag.to_s}()"
-      !!eval(source)
+
+      DataBank.with_data(args) { !!eval(source) }
     rescue => e
       true
     end
 
-    def break(tag = :default)
+    def break(tag = :default, *args)
       source = File.read(IDBG_SCRIPTS_FOLDER + "/break.rb")
       source += "\n#{tag.to_s}()"
-      binding.pry if eval(source)
+
+      DataBank.with_data(args) do
+        if eval(source)
+          binding.pry
+        end
+      end
     rescue => e
       binding.pry
     end
@@ -208,7 +236,7 @@ class IDbg
       open(IDBG_SEMAPHORE_FILE, 'a+') { |f| f << "#{tag}\n" }
 
       log("Tag #{tag} is executed once now", *args)
-      
+
       yield
     end
 

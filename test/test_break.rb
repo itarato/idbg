@@ -8,8 +8,7 @@ require_relative("../i_dbg.rb")
 
 def alpha
   x = 1
-  binding.pry
-  IDbg.break(:always_true)
+  IDbg.break(:always_true, "hello", { foo: "bar" })
 end
 
 def beta
