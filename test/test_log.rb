@@ -4,3 +4,4 @@ require_relative("../i_dbg.rb")
 
 IDbg.log("Single message")
 IDbg.log("Multiple messages", 123, [:start, :ship])
+IDbg << "This works too"

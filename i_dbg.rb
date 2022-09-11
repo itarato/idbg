@@ -59,10 +59,17 @@
 #
 # ```ruby
 # IDbg.log(@user, "was logged in with", @user_access)
+# IDbg << "Or simply this."
+# ```
+#
+# On Apple OS-X only the system notification can be used too:
+#
+# ```ruby
+# IDbg.flash("User is deleted", @user)
 # ```
 #
 # ---
-# Component: call logger
+# Component: instance call tracker
 #
 # Say you're interested in knowing the order of execution and what functions
 # were executed in a class during a flow. IDbg allows logging all calls and
@@ -78,8 +85,56 @@
 # ```
 #
 # ---
-# Component:
+# Component: external/custom script executors
 #
+# Sometimes a debugging is just so convoluted or maybe it's even evolving into
+# its own code that it's better to keep it somewhere else. As well - these
+# scripts act as a signal.
+# This has two flavors: execution of a custom script which breaks the flow
+# with `pry` when it results truthy - and the other one that yields to a block
+# when evals to truthy.
+# Said scripts must be placed in `IDBG_SCRIPTS_FOLDER/break.rb` as functions.
+#
+# ```ruby
+# # Inside IDBG_SCRIPTS_FOLDER/break.rb
+# def my_script
+#   # do some things
+#   return true # in case we need a reaction
+# end
+#
+# # Inside application code (will block with `binding.pry`, since its true):
+# IDbg.break_if(:my_script)
+#
+# # Or a custom block version:
+# IDbg.yield_if(:my_script) { Rails.cache.clear ; @user.reload }
+# ```
+# An expected side effect of these is that they do not trigger source-code
+# reload when the script is updated.
+#
+# Call params can be passed/inspected too:
+#
+# ```ruby
+# # Inside IDBG_SCRIPTS_FOLDER/break.rb
+# def my_script
+#   args = IDbg::DataBank.data
+# end
+#
+# # Inside application code (will block with `binding.pry`, since its true):
+# IDbg.break_if(:my_script, "arg1", { arg2: "foo" })
+# ```
+#
+# ---
+# Component: backtrace
+#
+# Often you want to know where you are in the execution. IDbg's backtrace
+# can be customized with length and levels.
+#
+# ```ruby
+# # Log a backtrace to the log file.
+# IDbg.backtrace
+# # Dump it right on the current output:
+# IDbg.dump_backtrace
+# ```
 
 ###############################################################################
 # CONFIGURATION
@@ -150,18 +205,18 @@ class IDbg
       AllMethodLogger
     end
 
-    def real_time_if(tag = :default, *args)
+    def yield_if(fn = :default, *args)
       source = File.read(IDBG_SCRIPTS_FOLDER + "/break.rb")
-      source += "\n#{tag.to_s}()"
+      source += "\n#{fn.to_s}()"
 
       DataBank.with_data(args) { !!eval(source) }
     rescue => e
       true
     end
 
-    def break(tag = :default, *args)
+    def break_if(fn = :default, *args)
       source = File.read(IDBG_SCRIPTS_FOLDER + "/break.rb")
-      source += "\n#{tag.to_s}()"
+      source += "\n#{fn.to_s}()"
 
       DataBank.with_data(args) do
         if eval(source)
@@ -181,6 +236,7 @@ class IDbg
       with_logfile { |f| f << "#{signature}\n\t\e[92m#{args.map(&:to_s).join(' | ')}\e[0m\n" }
       args[0]
     end
+    alias_method(:<<, :log)
 
     def log_and_backtrace(*args, level: 2, line_limit: 1000)
       result = log(*args)

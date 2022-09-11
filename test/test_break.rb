@@ -8,12 +8,12 @@ require_relative("../i_dbg.rb")
 
 def alpha
   x = 1
-  IDbg.break(:always_true, "hello", { foo: "bar" })
+  IDbg.break_if(:always_true, "hello", { foo: "bar" })
 end
 
 def beta
   x = 1
-  IDbg.break(:always_false)
+  IDbg.break_if(:always_false)
 end
 
 alpha
