@@ -3,6 +3,75 @@
 ###############################################################################
 # DOCUMENTATION
 ###############################################################################
+#
+# IDbg is an opinionated debug helper toolkit for the world where Ruby
+# debugging is destroyed so much we need to back to `puts`.
+#
+# There are specific aspects this toolkit is trying to address:
+# - debuggers are not reliable (JetBrain, debug-ide, pry, etc)
+# - breaking is not always the best or desired way
+# - updating code (even debugging code) can trigger a sluggish auto source-
+#   -reload mechanism
+# - debugging sometimes requires tricks
+
+###############################################################################
+# How to install?
+#
+# IDbg was designed for a Ruby backend workspace where things should stay
+# separate (out of git) and low footprint. Hence my workflow is the following:
+# - copy `i_dbg.rb` into one of the project folder that is autoloading this
+#   file
+# - add it to your global gitignore
+# - edit the configurations (best is via environment variables, but if that
+#   does not work, just hardcode it in the section below)
+# - make a folder for aid scripts and temp files and set it in the config:
+#   `IDBG_SCRIPTS_FOLDER`
+
+###############################################################################
+# How to use?
+#
+# Simplest example is to log messages uninterrupted. In a desired place insert
+# a log:
+#
+# ```ruby
+# # Some backend file you're debugging.
+# ...
+# class AppController < ApplicationController
+#   def update
+#     IDbg.log("Received params", params, @user, @ctx)
+#   end
+# end
+# ```
+#
+# Then open the log and watch:
+#
+# ```bash
+# $> tail -F /tmp/idbg.log
+# ```
+
+###############################################################################
+# Components
+#
+# Component: logger
+#
+# Logger is logging all input to a semi-structured file, so it's both isolated
+# and convenient for a watcher, without stopping code execution.
+#
+# ```ruby
+# IDbg.log(@user, "was logged in with", @user_access)
+# ```
+#
+# ---
+# Component: call logger
+#
+# Say you're interested in knowing the order of execution and what functions 
+# were executed in a class during a flow. IDbg allows logging all calls and
+# with or without arguments:
+#
+# ```ruby
+# 
+# ```
+#
 
 ###############################################################################
 # CONFIGURATION
