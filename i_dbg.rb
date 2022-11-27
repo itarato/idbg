@@ -234,14 +234,14 @@ class IDbg
       methods.each do |method|
         target.send(:alias_method, "__old_#{method}", method)
 
-        target.define_method("__new_#{method}") do |*args|
+        target.define_method("__new_#{method}") do |*args, **kwargs|
           if with_args
-            IDbg.log("Called: #{target}\##{method}", "Args", args)
+            IDbg.log("Called: #{target}\##{method}", "Args", args, "Kwargs", kwargs)
           else
             IDbg.log("Called: #{target}\##{method}")
           end
 
-          send("__old_#{method}", *args)
+          send("__old_#{method}", *args, **kwargs)
         end
 
         target.send(:alias_method, method, "__new_#{method}")

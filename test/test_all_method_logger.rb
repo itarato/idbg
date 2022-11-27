@@ -8,10 +8,10 @@ class Foo
   end
 
   def alpha(i)
-    beta(foo: 123)
+    beta(foo: 123, key: :zibzub)
   end
 
-  def beta(args)
+  def beta(key:, **args)
     gamma(:a, :b, :c)
   end
 
