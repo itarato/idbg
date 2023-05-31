@@ -76,7 +76,7 @@
 # with or without arguments:
 #
 # ```ruby
-# class SomeClassgenerate_backtrace
+# class SomeClass
 #   # Insert before closing `end`:
 #   include(IDbg.function_logger.with_args)
 # end
