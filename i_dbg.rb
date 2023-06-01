@@ -260,7 +260,9 @@ class IDbg
       result
     end
 
-    def self.data = @@data
+    def self.data
+      @@data
+    end
   end
 
   class << self
