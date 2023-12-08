@@ -430,3 +430,19 @@ class IDbg
     end
   end
 end
+
+class ActiveSupport::Logger
+  alias_method(:__idbg_original_error, :error)
+  alias_method(:error, :__idbg_original_error)
+
+  def error(msg)
+    __idbg_original_error("\e[41m #{msg} \e[0m")
+  end
+
+  alias_method(:__idbg_original_warn, :warn)
+  alias_method(:warn, :__idbg_original_warn)
+
+  def warn(msg)
+    __idbg_original_warn("\e[48;5;94m #{msg} \e[0m")
+  end
+end
