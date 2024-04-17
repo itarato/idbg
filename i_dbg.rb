@@ -174,6 +174,17 @@
 #   IDbg.once(:cache_check, @cache)
 # end
 # ```
+#
+# ---
+# Component: measure
+#
+# If you need to measure the time spent in a block:
+#
+# ```ruby
+# IDbg.measure(:my_critical_block) do
+#   # code ...
+# end
+# ```
 
 ###############################################################################
 # CONFIGURATION
@@ -303,6 +314,15 @@ class IDbg
     end
     alias_method(:<<, :log)
 
+    def measure(*args, &blk)
+      start_t = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+
+      blk.call
+
+      elapsed = Process.clock_gettime(Process::CLOCK_MONOTONIC) - start_t
+      log(*(args + ["Elapsed: #{ "%.3f" % elapsed } s"]))
+    end
+
     def backtrace(*args, level: IDBG_BACKTRACE_DEFAULT_LEVEL, line_limit: 1000)
       log(*args) if !args.empty?
 
@@ -431,18 +451,20 @@ class IDbg
   end
 end
 
-class ActiveSupport::Logger
-  alias_method(:__idbg_original_error, :error)
-  alias_method(:error, :__idbg_original_error)
+if defined?(ActiveSupport)
+  class ActiveSupport::Logger
+    alias_method(:__idbg_original_error, :error)
+    alias_method(:error, :__idbg_original_error)
 
-  def error(msg)
-    __idbg_original_error("\e[41m #{msg} \e[0m")
-  end
+    def error(msg)
+      __idbg_original_error("\e[41m #{msg} \e[0m")
+    end
 
-  alias_method(:__idbg_original_warn, :warn)
-  alias_method(:warn, :__idbg_original_warn)
+    alias_method(:__idbg_original_warn, :warn)
+    alias_method(:warn, :__idbg_original_warn)
 
-  def warn(msg)
-    __idbg_original_warn("\e[48;5;94m #{msg} \e[0m")
+    def warn(msg)
+      __idbg_original_warn("\e[48;5;94m #{msg} \e[0m")
+    end
   end
 end
