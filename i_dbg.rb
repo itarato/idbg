@@ -283,7 +283,7 @@ class IDbg
 
     def yield_if(fn = :default, *args)
       source = File.read(IDBG_SCRIPTS_FOLDER + "/break.rb")
-      source += "\n#{fn.to_s}()"
+      source += "\n#{fn}()"
 
       DataBank.with_data(args) { !!eval(source) }
     rescue => e
@@ -292,7 +292,7 @@ class IDbg
 
     def break_if(fn = :default, *args)
       source = File.read(IDBG_SCRIPTS_FOLDER + "/break.rb")
-      source += "\n#{fn.to_s}()"
+      source += "\n#{fn}()"
 
       DataBank.with_data(args) do
         if eval(source)
@@ -320,17 +320,17 @@ class IDbg
       blk.call
 
       elapsed = Process.clock_gettime(Process::CLOCK_MONOTONIC) - start_t
-      log(*(args + ["Elapsed: #{ "%.3f" % elapsed } s"]))
+      log(*(args + ["Elapsed: #{"%.3f" % elapsed} s"]))
     end
 
     def backtrace(*args, level: IDBG_BACKTRACE_DEFAULT_LEVEL, line_limit: 1000)
       log(*args) if !args.empty?
 
-    	with_logfile do |f|
-    		f << "#{signature} -- BACKTRACE\n\n"
+      with_logfile do |f|
+        f << "#{signature} -- BACKTRACE\n\n"
         generate_backtrace(level, line_limit: line_limit) { |line| f << "\t" + line + "\n" }
-	    	f << "\n"
-    	end
+        f << "\n"
+      end
 
       args.first
     end
@@ -372,7 +372,7 @@ class IDbg
         return
       end
 
-      open(IDBG_SCRIPTS_FOLDER + "/once.txt", 'a+') { |f| f << "#{tag.to_s}\n" }
+      open(IDBG_SCRIPTS_FOLDER + "/once.txt", 'a+') { |f| f << "#{tag}\n" }
 
       log("Tag #{tag} is executed once now", *args)
 
@@ -404,7 +404,7 @@ class IDbg
     end
 
     def signature
-    	"[\e[95m#{timestamp}\e[0m \e[2m#{caller}\e[0m]"
+      "[\e[95m#{timestamp}\e[0m \e[2m#{caller}\e[0m]"
     end
 
     def raw_signature
@@ -412,11 +412,11 @@ class IDbg
     end
 
     def caller
-    	prettify_backtrace_location(backtrace_list[0])
+      prettify_backtrace_location(backtrace_list[0])
     end
 
     def backtrace_list
-    	caller_locations.reverse.take_while { |loc| loc.to_s.index(__FILE__) == nil }.reverse
+      caller_locations.reverse.take_while { |loc| loc.to_s.index(__FILE__) == nil }.reverse
     end
 
     def prettify_backtrace_location(loc)
@@ -427,7 +427,7 @@ class IDbg
     end
 
     def timestamp
-    	Time.now.strftime('%T')
+      Time.now.strftime('%T')
     end
 
     def with_logfile(&block)
@@ -441,8 +441,8 @@ class IDbg
 
         @has_log_file = true
         open(IDBG_LOGFILE, 'a+') do |f|
-        	f << "\n\e[106m\e[1m\e[97m  --- LOG START @ #{Time.now} ---  \e[0m\n\n"
-        	block.call(f)
+          f << "\n\e[106m\e[1m\e[97m  --- LOG START @ #{Time.now} ---  \e[0m\n\n"
+          block.call(f)
         end
       else
         open(IDBG_LOGFILE, 'a+', &block)
@@ -453,18 +453,48 @@ end
 
 if defined?(ActiveSupport)
   class ActiveSupport::Logger
+    alias_method(:__idbg_original_debug, :debug)
+    alias_method(:debug, :__idbg_original_debug)
+
+    def debug(msg = nil, ...)
+      if msg
+        __idbg_original_debug("\e[90m#{msg[0..32]}...\e[0m", ...)
+      else
+        __idbg_original_debug(...)
+      end
+    end
+
+    alias_method(:__idbg_original_info, :info)
+    alias_method(:info, :__idbg_original_info)
+
+    def info(msg = nil, ...)
+      if msg
+        __idbg_original_info("\e[90m#{msg[0..32]}...\e[0m", ...)
+      else
+        __idbg_original_info(...)
+      end
+    end
+
     alias_method(:__idbg_original_error, :error)
     alias_method(:error, :__idbg_original_error)
 
-    def error(msg)
-      __idbg_original_error("\e[41m #{msg} \e[0m")
+    def error(msg = nil, ...)
+      if msg
+        __idbg_original_error("\e[41m #{msg} \e[0m", ...)
+      else
+        __idbg_original_error(...)
+      end
     end
 
     alias_method(:__idbg_original_warn, :warn)
     alias_method(:warn, :__idbg_original_warn)
 
-    def warn(msg)
-      __idbg_original_warn("\e[48;5;94m #{msg} \e[0m")
+    def warn(msg = nil, ...)
+      if msg
+        __idbg_original_warn("\e[48;5;94m #{msg} \e[0m", ...)
+      else
+        __idbg_original_warn(...)
+      end
     end
   end
 end
